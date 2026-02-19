@@ -1,7 +1,7 @@
 package main
 
-import "fmt"
+import "github.com/DKeshavarz/gort/cmd"
 
 func main() {
-	fmt.Println("hello")
+	cmd.Execute()
 }
