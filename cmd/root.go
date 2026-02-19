@@ -37,7 +37,7 @@ For more information, use 'gort [command] --help'`,
 
 		fmt.Println("\nOpen ports:")
 		for _, result := range results {
-			fmt.Printf("%d/%s\t%s\n", result.Port, scanner.GetServiceName(result.Port), result.Service)
+			fmt.Printf("%d/%s\t%s\n", result.Port, result.State, result.Service)
 		}
 	},
 }
