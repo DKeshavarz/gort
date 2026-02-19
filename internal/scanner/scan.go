@@ -7,10 +7,9 @@ import (
     "time"
 )
 
-// ScanResult represents the result of a port scan
 type ScanResult struct {
     Port    int
-    State   string // "open", "closed", "filtered"
+    State   string 
     Service string
 }
 
@@ -21,36 +20,31 @@ func TCPConnectScan(target string, ports []int, timeout time.Duration) ([]ScanRe
     var mu sync.Mutex
     var wg sync.WaitGroup
 
-    // Validate target IP/hostname
     if target == "" {
         return nil, fmt.Errorf("target cannot be empty")
     }
 
-    // Resolve target to ensure it's valid
     _, err := net.ResolveIPAddr("ip", target)
     if err != nil {
         return nil, fmt.Errorf("failed to resolve target: %v", err)
     }
 
-    // Set default timeout if not provided
     if timeout == 0 {
         timeout = 2 * time.Second
     }
 
-    // Create a semaphore channel to limit concurrency
-    // This prevents overwhelming the system/network
     maxConcurrency := 100
     sem := make(chan struct{}, maxConcurrency)
 
     for _, port := range ports {
         wg.Add(1)
-        sem <- struct{}{} // Acquire token
+        sem <- struct{}{} 
 
         go func(port int) {
             defer wg.Done()
-            defer func() { <-sem }() // Release token
+            defer func() { <-sem }() 
 
-            address := fmt.Sprintf("%s:%d", target, port)
+            address := net.JoinHostPort(target, fmt.Sprintf("%d", port))
             
             conn, err := net.DialTimeout("tcp", address, timeout)
             
@@ -60,14 +54,14 @@ func TCPConnectScan(target string, ports []int, timeout time.Duration) ([]ScanRe
                 return
             }
             
-            // Connection succeeded - port is open
+            
             conn.Close()
             
             mu.Lock()
             results = append(results, ScanResult{
                 Port:    port,
                 State:   "open",
-                Service: GetServiceName(port), // Common service mapping
+                Service: GetServiceName(port), 
             })
             mu.Unlock()
         }(port)

@@ -24,7 +24,6 @@ For more information, use 'gort [command] --help'`,
 		target := args[0]
 		fmt.Printf("Scanning target: %s\n", target)
 
-		// TODO: Implement port scanning logic
 		results, err := scanner.TCPConnectScanCommon(target, 2*time.Second)
 		if err != nil {
 			fmt.Printf("Scan failed: %v\n", err)
@@ -50,6 +49,3 @@ func Execute() {
 	}
 }
 
-func init() {
-
-}
