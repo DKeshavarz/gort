@@ -19,12 +19,14 @@ Features:
   • Nothing
 
 For more information, use 'gort [command] --help'`,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		target := args[0]
+		method := args[1]
 		fmt.Printf("Scanning target: %s\n", target)
 
-		results, err := scanner.TCPConnectScanCommon(target, 2*time.Second)
+		results, err := scanner.ConnectScanCommon(target, method, 2*time.Second)
+
 		if err != nil {
 			fmt.Printf("Scan failed: %v\n", err)
 			return
@@ -48,4 +50,3 @@ func Execute() {
 		os.Exit(1)
 	}
 }
-
