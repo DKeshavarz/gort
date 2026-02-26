@@ -12,7 +12,8 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "gort [ip/host]",
 	Short: "Gort - Fast network port scanner and OS fingerprinting tool",
-	Long: `Gort (Go + Port) is a high-performance network reconnaissance tool that scans
+	Long: 
+`Gort (Go + Port) is a high-performance network reconnaissance tool that scans
 for open ports, identifies running services, and fingerprints operating systems.
 
 Features:
