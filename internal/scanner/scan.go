@@ -128,17 +128,17 @@ func UDPScan(target string, ports []int, timeout time.Duration) ([]ScanResult, e
 			_, err = conn.Write([]byte("\x0D\x0A\x00\x00\x00\x00\x00\x00"))
 
 			buffer := make([]byte, 1024)
-			_, err = conn.Read(buffer)
+			n, err := conn.Read(buffer)
 
-			state := "open|filtered"
-			if err == nil {
-				state = "open"
+			
+			if err != nil || n <= 0{
+				return 
 			}
 
 			mu.Lock()
 			results = append(results, ScanResult{
 				Port:    port,
-				State:   state + " (UDP)",
+				State:   "open",
 				Service: getServiceName(port),
 			})
 			mu.Unlock()
