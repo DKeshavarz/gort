@@ -28,9 +28,9 @@ go.work.sum
 .env
 
 # Editor/IDE
-# .idea/
-# .vscode/
-# .codacy
+.idea/
+.vscode/
+.codacy/
 
 ## Custom
 gort
