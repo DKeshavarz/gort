@@ -17,8 +17,8 @@ func scan(args []string) {
 		results, err = scanner.NewScaner().Target(target).TCPConnect().Do()
 	case udpScan:
 		results, err = scanner.NewScaner().UDP().Target(target).Do()
-	// case synScan:
-	// 	scanType = "SYN stealth"
+	case synScan:
+		results, err = scanner.NewScaner().SYN().Target(target).Do()
 	// case finScan:
 	// 	scanType = "FIN"
 	// case xmasScan:
