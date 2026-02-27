@@ -7,29 +7,37 @@ import (
 	"time"
 )
 
-// UDPScan performs a UDP scan on the specified target and ports (Similar to Nmap -sU)
-func UDPScan(target string, ports []int, timeout time.Duration) ([]ScanResult, error) {
+type UDP struct{}
+
+func (b *Scaner) UDP() *Scaner {
+	b.strategy = &UDP{}
+	return b
+}
+
+// UDPScan performs a UDP scan on the specified target and ports
+// Returns a slice of ScanResult for ports that respond
+func (u *UDP) Scan(req *ScanRequest) ([]ScanResult, error) {
 	var results []ScanResult
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	if target == "" {
+	if req.Target == "" {
 		return nil, fmt.Errorf("target cannot be empty")
 	}
 
-	_, err := net.ResolveIPAddr("ip", target)
+	_, err := net.ResolveIPAddr("ip", req.Target)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve target: %v", err)
 	}
 
-	if timeout == 0 {
-		timeout = 2 * time.Second
+	if req.Timeout <= 0 {
+		return nil, fmt.Errorf("invalid timeout")
 	}
 
 	maxConcurrency := 100
 	sem := make(chan struct{}, maxConcurrency)
 
-	for _, port := range ports {
+	for _, port := range req.Ports {
 		wg.Add(1)
 		sem <- struct{}{}
 
@@ -37,24 +45,30 @@ func UDPScan(target string, ports []int, timeout time.Duration) ([]ScanResult, e
 			defer wg.Done()
 			defer func() { <-sem }()
 
-			address := net.JoinHostPort(target, fmt.Sprintf("%d", port))
+			address := net.JoinHostPort(req.Target, fmt.Sprintf("%d", port))
 
-			conn, err := net.DialTimeout("udp", address, timeout)
+			conn, err := net.DialTimeout("udp", address, req.Timeout)
 			if err != nil {
 				return
 			}
 			defer conn.Close()
 
-			conn.SetDeadline(time.Now().Add(timeout))
-			_, err = conn.Write([]byte("\x0D\x0A\x00\x00\x00\x00\x00\x00"))
-
-			buffer := make([]byte, 1024)
-			n, err := conn.Read(buffer)
-
-			if err != nil || n <= 0 {
+			// Set deadline and send probe
+			conn.SetDeadline(time.Now().Add(req.Timeout))
+			probe := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+			_, err = conn.Write(probe)
+			if err != nil {
 				return
 			}
 
+			// Wait for response
+			buffer := make([]byte, 1024)
+			_, err = conn.Read(buffer)
+			if err != nil {
+				return // No response = filtered
+			}
+
+			// Got response - port is open
 			mu.Lock()
 			results = append(results, ScanResult{
 				Port:    port,
@@ -70,3 +84,5 @@ func UDPScan(target string, ports []int, timeout time.Duration) ([]ScanResult, e
 
 	return results, nil
 }
+
+func (u *UDP) Name() string { return "UDP" }

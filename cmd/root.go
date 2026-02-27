@@ -19,16 +19,6 @@ For more information, use 'gort [command] --help'`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		scan(args)
-		// target := args[0]
-		// fmt.Printf("Scanning target: %s\n", target)
-
-		// results, err := scanner.ConnectScanCommon(target, "tcp", 2*time.Second)
-
-		// if err != nil {
-		// 	fmt.Printf("Scan failed: %v\n", err)
-		// 	return
-		// }
-
 	},
 }
 

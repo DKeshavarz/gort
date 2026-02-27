@@ -15,8 +15,8 @@ func scan(args []string) {
 	switch {
 	case tcpScan:
 		results, err = scanner.NewScaner().Target(target).TCPConnect().Do()
-	// case udpScan:
-	// 	scanType = "UDP"
+	case udpScan:
+		results, err = scanner.NewScaner().UDP().Target(target).Do()
 	// case synScan:
 	// 	scanType = "SYN stealth"
 	// case finScan:
@@ -31,6 +31,7 @@ func scan(args []string) {
 
 	if err != nil {
 		showErr(err)
+		return
 	}
 	show(results)
 }
@@ -42,7 +43,7 @@ func show(results []scanner.ScanResult) {
 		return
 	}
 
-	fmt.Println("\nOpen ports:")
+	fmt.Println("Open ports:")
 	for _, result := range results {
 		fmt.Printf("%d/%s\t%s\n", result.Port, result.State, result.Service)
 	}
