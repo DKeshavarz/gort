@@ -36,9 +36,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&finScan, "fin", "F", false, "FIN scan")
 	rootCmd.Flags().BoolVarP(&xmasScan, "xmas", "X", false, "XMAS scan")
 	rootCmd.Flags().BoolVarP(&scaning, "scan", "s", false, "scan")
+	rootCmd.Flags().BoolVarP(&osDetect, "os", "O", false, "OS fingerprinting detection")
 
-	// Mark as mutually exclusive
-	rootCmd.MarkFlagsOneRequired("scan")
 	rootCmd.MarkFlagsMutuallyExclusive("tcp", "udp", "syn", "fin", "xmas")
-	rootCmd.MarkFlagsOneRequired("tcp", "udp", "syn", "fin", "xmas")
 }
