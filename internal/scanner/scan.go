@@ -116,8 +116,9 @@ func ConnectScanCommon(target string, method string, timeout time.Duration) ([]S
 	}
 
 	handlers := map[string]func(target string, ports []int, timeout time.Duration) ([]ScanResult, error){
-		"udp": UDPScan,
-		"tcp": TCPConnectScan,
+		"udp":   UDPScan,
+		"tcp":   TCPConnectScan,
+		"smart": TCPSmartScan,
 	}
 
 	if handler, ok := handlers[method]; ok {
@@ -125,6 +126,72 @@ func ConnectScanCommon(target string, method string, timeout time.Duration) ([]S
 	}
 
 	return nil, fmt.Errorf("invalid method: %s", method)
+}
+
+// TCPSmartScan performs an application-aware TCP scan.
+// It connects to the port, sends a minimal probe, and analyzes socket behavior.
+func TCPSmartScan(target string, ports []int, timeout time.Duration) ([]ScanResult, error) {
+	var results []ScanResult
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	if target == "" {
+		return nil, fmt.Errorf("target cannot be empty")
+	}
+
+	maxConcurrency := 100
+	sem := make(chan struct{}, maxConcurrency)
+
+	for _, port := range ports {
+		wg.Add(1)
+		sem <- struct{}{}
+
+		go func(port int) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			address := net.JoinHostPort(target, fmt.Sprintf("%d", port))
+
+			conn, err := net.DialTimeout("tcp", address, timeout)
+			if err != nil {
+				// Port is closed or filtered
+				return
+			}
+			defer conn.Close()
+
+			conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
+
+			_, _ = conn.Write([]byte("\r\n"))
+
+			buf := make([]byte, 64)
+			n, err := conn.Read(buf)
+
+			state := "open"
+			switch {
+			case err != nil:
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					state = "open (silent)"
+				} else {
+					state = "open (no response)"
+				}
+			case n > 0:
+				state = "open (responsive)"
+			}
+
+			mu.Lock()
+			results = append(results, ScanResult{
+				Port:    port,
+				State:   state,
+				Service: GetServiceName(port),
+			})
+			mu.Unlock()
+		}(port)
+	}
+
+	wg.Wait()
+	close(sem)
+
+	return results, nil
 }
 
 // UDPScan performs a UDP scan on the specified target and ports (Similar to Nmap -sU)
