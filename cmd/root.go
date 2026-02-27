@@ -18,7 +18,7 @@ Features:
 For more information, use 'gort [command] --help'`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		scan(cmd, args)
+		scan(args)
 		// target := args[0]
 		// fmt.Printf("Scanning target: %s\n", target)
 
@@ -29,15 +29,6 @@ For more information, use 'gort [command] --help'`,
 		// 	return
 		// }
 
-		// if len(results) == 0 {
-		// 	fmt.Println("No open ports found")
-		// 	return
-		// }
-
-		// fmt.Println("\nOpen ports:")
-		// for _, result := range results {
-		// 	fmt.Printf("%d/%s\t%s\n", result.Port, result.State, result.Service)
-		// }
 	},
 }
 
@@ -49,7 +40,7 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.Flags().BoolVarP(&tcpScan, "tcp", "T", false, "TCP connect scan")
+	rootCmd.Flags().BoolVarP(&tcpScan, "tcp", "T", false, "Completes full TCP handshake")
 	rootCmd.Flags().BoolVarP(&udpScan, "udp", "U", false, "UDP scan")
 	rootCmd.Flags().BoolVarP(&synScan, "syn", "S", false, "SYN stealth scan")
 	rootCmd.Flags().BoolVarP(&finScan, "fin", "F", false, "FIN scan")

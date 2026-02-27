@@ -3,31 +3,54 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
+	"github.com/DKeshavarz/gort/internal/scanner"
 )
 
-func scan(cmd *cobra.Command, args []string) {
+func scan(args []string) {
 	target := args[0]
 
-	// Determine scan type
-	var scanType string
+	var results []scanner.ScanResult
+	var err error
+
 	switch {
 	case tcpScan:
-		scanType = "TCP connect"
-	case udpScan:
-		scanType = "UDP"
-	case synScan:
-		scanType = "SYN stealth"
-	case finScan:
-		scanType = "FIN"
-	case xmasScan:
-		scanType = "XMAS"
+		results, err = scanner.NewScaner().Target(target).TCPConnect().Do()
+	// case udpScan:
+	// 	scanType = "UDP"
+	// case synScan:
+	// 	scanType = "SYN stealth"
+	// case finScan:
+	// 	scanType = "FIN"
+	// case xmasScan:
+	// 	scanType = "XMAS"
 	default:
-		
+
 		fmt.Println("Error: No scan type specified")
 		return
 	}
 
-	fmt.Printf("Starting %s scan on %s\n", scanType, target)
+	if err != nil {
+		showErr(err)
+	}
+	show(results)
+}
 
+func show(results []scanner.ScanResult) {
+
+	if len(results) == 0 {
+		fmt.Println("No open ports found")
+		return
+	}
+
+	fmt.Println("\nOpen ports:")
+	for _, result := range results {
+		fmt.Printf("%d/%s\t%s\n", result.Port, result.State, result.Service)
+	}
+}
+
+func showErr(err error) {
+	if err == nil {
+		return
+	}
+	fmt.Println(err.Error())
 }
