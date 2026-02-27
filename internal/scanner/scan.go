@@ -2,153 +2,97 @@ package scanner
 
 import (
 	"fmt"
-	"net"
-	"sync"
 	"time"
 )
 
-type ScanResult struct {
-	Port    int
-	State   string
-	Service string
+
+type ScanStrategy interface {
+	Scan(req *ScanRequest) ([]ScanResult, error)
+	Name() string
 }
 
-// TCPConnectScan performs a TCP connect scan on the specified target and ports
-// Returns a slice of ScanResult for open ports
-func TCPConnectScan(target string, ports []int, timeout time.Duration) ([]ScanResult, error) {
-	var results []ScanResult
-	var mu sync.Mutex
-	var wg sync.WaitGroup
+type ScanRequest struct {
+	Target  string
+	Ports   []int
+	Timeout time.Duration
+}
 
+// Scaner builds scan requests
+type Scaner struct {
+	request *ScanRequest
+	strategy ScanStrategy
+	errors  []error
+}
+
+func NewScaner() *Scaner {
+	return &Scaner{
+		request: &ScanRequest{
+			Ports:   commonPorts(),
+			Timeout: 2 * time.Second,
+		},
+		strategy: &TCPConnect{},
+	}
+}
+
+func (b *Scaner) Target(target string) *Scaner {
 	if target == "" {
-		return nil, fmt.Errorf("target cannot be empty")
+		b.errors = append(b.errors, fmt.Errorf("target cannot be empty"))
+		return b
 	}
-
-	_, err := net.ResolveIPAddr("ip", target)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve target: %v", err)
-	}
-
-	if timeout == 0 {
-		timeout = 2 * time.Second
-	}
-
-	maxConcurrency := 100
-	sem := make(chan struct{}, maxConcurrency)
-
-	for _, port := range ports {
-		wg.Add(1)
-		sem <- struct{}{}
-
-		go func(port int) {
-			defer wg.Done()
-			defer func() { <-sem }()
-
-			address := net.JoinHostPort(target, fmt.Sprintf("%d", port))
-
-			conn, err := net.DialTimeout("tcp", address, timeout)
-
-			if err != nil {
-				// Connection failed - port is likely closed or filtered -> can add more
-				return
-			}
-			defer conn.Close()
-
-			mu.Lock()
-			results = append(results, ScanResult{
-				Port:    port,
-				State:   "open",
-				Service: getServiceName(port),
-			})
-			mu.Unlock()
-		}(port)
-	}
-
-	wg.Wait()
-	close(sem)
-
-	return results, nil
+	b.request.Target = target
+	return b
 }
 
-// ConnectScanCommon scans the most common ports with specific method
-func ConnectScanCommon(target string, method string, timeout time.Duration) ([]ScanResult, error) {
-	commonPorts := commonPorts()
-
-	handlers := map[string]func(target string, ports []int, timeout time.Duration) ([]ScanResult, error){
-		"udp": UDPScan,
-		"tcp": TCPConnectScan,
+func (b *Scaner) Ports(ports []int) *Scaner {
+	if len(ports) == 0 {
+		b.errors = append(b.errors, fmt.Errorf("ports cannot be empty"))
+		return b
 	}
 
-	if handler, ok := handlers[method]; ok {
-		return handler(target, commonPorts, timeout)
+	// Validate ports
+	for _, p := range ports {
+		if p < 1 || p > 65535 {
+			b.errors = append(b.errors, fmt.Errorf("invalid port number: %d", p))
+			return b
+		}
 	}
 
-	return nil, fmt.Errorf("invalid method: %s", method)
+	b.request.Ports = ports
+	return b
 }
 
-// UDPScan performs a UDP scan on the specified target and ports (Similar to Nmap -sU)
-func UDPScan(target string, ports []int, timeout time.Duration) ([]ScanResult, error) {
-	var results []ScanResult
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-
-	if target == "" {
-		return nil, fmt.Errorf("target cannot be empty")
+func (b *Scaner) PortRange(start, end int) *Scaner {
+	if start < 1 || end > 65535 || start > end {
+		b.errors = append(b.errors, fmt.Errorf("invalid port range: %d-%d", start, end))
+		return b
 	}
 
-	_, err := net.ResolveIPAddr("ip", target)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve target: %v", err)
+	ports := make([]int, 0, end-start+1)
+	for i := start; i <= end; i++ {
+		ports = append(ports, i)
 	}
 
-	if timeout == 0 {
-		timeout = 2 * time.Second
-	}
-
-	maxConcurrency := 100
-	sem := make(chan struct{}, maxConcurrency)
-
-	for _, port := range ports {
-		wg.Add(1)
-		sem <- struct{}{}
-
-		go func(port int) {
-			defer wg.Done()
-			defer func() { <-sem }()
-
-			address := net.JoinHostPort(target, fmt.Sprintf("%d", port))
-
-			conn, err := net.DialTimeout("udp", address, timeout)
-			if err != nil {
-				return
-			}
-			defer conn.Close()
-
-			conn.SetDeadline(time.Now().Add(timeout))
-			_, err = conn.Write([]byte("\x0D\x0A\x00\x00\x00\x00\x00\x00"))
-
-			buffer := make([]byte, 1024)
-			n, err := conn.Read(buffer)
-
-			
-			if err != nil || n <= 0{
-				return 
-			}
-
-			mu.Lock()
-			results = append(results, ScanResult{
-				Port:    port,
-				State:   "open",
-				Service: getServiceName(port),
-			})
-			mu.Unlock()
-		}(port)
-	}
-
-	wg.Wait()
-	close(sem)
-
-	return results, nil
+	b.request.Ports = ports
+	return b
 }
 
+func (b *Scaner) Timeout(timeout time.Duration) *Scaner {
+	if timeout <= 0 {
+		b.errors = append(b.errors, fmt.Errorf("timeout must be positive"))
+		return b
+	}
+	b.request.Timeout = timeout
+	return b
+}
 
+func (b *Scaner) Do() ([]ScanResult, error) {
+	if len(b.errors) > 0 {
+		return nil, fmt.Errorf("validation errors: %v", b.errors)
+	}
+
+	if b.request.Target == "" {
+		return nil, fmt.Errorf("target is required")
+	}
+	
+	return b.strategy.Scan(b.request)
+}
